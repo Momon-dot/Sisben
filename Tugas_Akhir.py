@@ -5,7 +5,7 @@ import screen_brightness_control as sbc
 import math
 from threading import Thread
 from tkinter import Tk, Button,  Label, Frame, ttk, DoubleVar, messagebox
-
+import csv
 
 class GUI(Frame):
     def create_widgets(self):
@@ -77,13 +77,36 @@ class GUI(Frame):
         self.count = -1
         self.run = False
         self.set_val = 0
+        self.saved_data = []
+        self.control_flag = True
+        self.save_flag = True
         self.start = Button(self, text='Start',width=25, command=lambda: Thread(target=self.Start).start())
         self.stop = Button(self, text='Stop', width=25, state='disabled', command=self.Stop)
-        self.reset = Button(self, text='Reset',width=25, state='disabled', command=lambda: self.Reset())
+        self.reset = Button(self, text='Reset&Save',width=25, state='disabled', command = self.Reset)
+        self.control = Button(self, text="Brighness Ctrl : ON", width=25, state='normal', command=self.enable_control)
+        self.save = Button(self, text="Save Data: ON", width=25, state='normal', command=self.enable_save)
         self.start.grid(row = 5, column = 0)
         self.stop.grid(row = 5, column = 1)
         self.reset.grid(row = 5, column = 2)
+        self.control.grid(row=5,column=3)
+        self.save.grid(row=5,column=4)
     
+    def enable_control(self):
+        if self.control_flag :
+            self.control['text'] = "Brighness Ctrl : OFF"
+            self.control_flag = False
+        else :
+            self.control['text'] = "Brighness Ctrl : ON"
+            self.control_flag = True
+
+    def enable_save(self):
+        if self.save_flag :
+            self.save['text'] = "Save Data: OFF"
+            self.save_flag = False
+        else :
+            self.save['text'] = "Save Data: ON"
+            self.save_flag = True
+
     def get_current_value(self):
         return self.current_value.get()
 
@@ -153,10 +176,15 @@ class GUI(Frame):
                 self.Label5['text'] = show5
                 #Increment the count after
                 #every 1 second
-                if self.count>3:
+                if self.count>3 and self.control_flag and self.save_flag:
                     self.brightness_control(LDR_r,Length,diff)
-                else : 
-                    time.sleep(1)
+                    data = [LDR_r,Length,Ambient_r]
+                    self.saved_data.append(data)
+                elif self.count>3 and self.control_flag and not(self.save_flag):
+                    self.brightness_control(LDR_r,Length,diff)
+                elif not(self.control_flag) and self.save_flag :
+                    data = [LDR_r,Length,Ambient_r]
+                    self.saved_data.append(data)
                 self.count += 1
             except :
                 self.run=False
@@ -169,10 +197,18 @@ class GUI(Frame):
         self.start['state'] = 'normal'
         self.stop['state'] = 'disabled'
         self.reset['state'] = 'normal'
+        self.control['state'] = 'normal'
+        self.save['state'] = 'normal'
         self.run = False
         if self.board != None :
             self.board.close()
 
+    def Write_data(self):
+        header = ["Brightness","Distance","Ambient Brightness"]
+        with open ("Controlled_Data.csv", 'w', encoding='UTF8', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+            writer.writerows(self.saved_data)
 
     # For Reset
     def Reset(self):
@@ -184,6 +220,10 @@ class GUI(Frame):
         self.Label3['text'] = "Brightness Difference : "
         self.Label4['text'] = "Brightness Difference : "
         self.Label5['text'] = "Time Lapsed : "
+        if self.save_flag :
+            self.Write_data()
+            self.saved_data.clear()
+
 
 
 
@@ -196,6 +236,8 @@ class GUI(Frame):
             self.stop['state'] = 'normal'
             self.reset['state'] = 'disabled'
             self.slider['state'] = 'disabled'
+            self.control['state'] = 'disabled'
+            self.save['state'] = 'disabled'
             self.var_name()
         except :
             messagebox.showerror("Error", "Device Tidak Terdeteksi !!")
